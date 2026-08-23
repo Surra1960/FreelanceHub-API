@@ -1,62 +1,50 @@
 
-const jobs=require('../models/jobs');
+const pool=require('../config/database');
 
-function getAllJobs(req,res){
-    res.json(jobs);
+async function getAllJobs(req,res){
+    const result= await pool.query('select * from jobs');
+    res.json(result.rows);
 
 }
 
-function getJobById(req,res){
+async function getJobById(req,res){
     const jobId=parseInt(req.params.id,10);
-    const job=jobs.find(job=>job.id===jobId);
-    if(job){
-        res.json(job);
+    const result = await pool.query('select * from jobs where id= $1',[jobId]);
+
+    if(result.rowCount >0){
+        res.json(result.rows[0]);
     }
     else {
         res.status(404).json({ message: 'Job not found' });
     }
 }
 
-function createJob(req,res){
-   console.log(req.body);
+async function createJob(req,res){
+   
+    const result= await pool.query('insert into jobs(title,company,location,salary,description) values($1,$2,$3, $4,$5) returning * ',[req.body.title, req.body.company,req.body.location, req.body.salary, req.body.description]);
 
-    const newJob={
-        id:jobs.length+1,
-        title:req.body.title,
-        company:req.body.company,
-        location:req.body.location,
-        salary:req.body.salary,
-        description:req.body.description  
-    }
-    jobs.push(newJob);
-
-   res.status(201).json(newJob); 
+   res.status(201).json(result.rows[0]); 
 }
 
-function updateJob(req,res){
+async function updateJob(req,res){
 
     const jobId=parseInt(req.params.id,10);
-    const job=jobs.find(job=>job.id===jobId);
+    
+        const result=await pool.query('update jobs set title= coalesce($1,title), company=coalesce( $2 ,company),     location= coalesce($3,location),       salary= coalesce($4 ,salary),    description= coalesce($5,description) where id=$6 returning * ',[req.body.title, req.body.company, req.body.location, req.body.salary, req.body.description, jobId]);
 
-    if(job){
-        job.title=req.body.title || job.title;
-        job.company=req.body.company || job.company;
-        job.location=req.body.location || job.location;
-        job.salary=req.body.salary || job.salary;
-        job.description=req.body.description || job.description;
-        res.status(200).json(job);
-    }
-    else {
+        if(result.rowCount >0){
+            res.status(200).json(result.rows[0]); 
+        }
+         else {
         res.status(404).json({message:'Job not found'});
-    }
+         }
 }
 
-function deleteJob(req,res){
+async function deleteJob(req,res){
     const jobId=parseInt(req.params.id,10);
-    const jobIndex=jobs.findIndex(job=>job.id===jobId);
+    const result= await pool.query('delete from jobs where id=$1 returning *',[jobId]);
 
-    if(jobIndex!==-1){
-        jobs.splice(jobIndex,1);
+    if(result.rowCount>0){
         res.status(200).json({message:'Job deleted successfully'});
     }
     else {
