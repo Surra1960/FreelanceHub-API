@@ -7,14 +7,18 @@ const app = express();
 
 const jobsRouter=require('./routes/jobs');
 
+const authRouter=require('./routes/auth');
+
+
+
 app.use(express.json());
 
 app.use('/jobs',jobsRouter);
 
-
+app.use('/auth',authRouter);
 app.get('/',(req,res)=>{
 
-    res.send('Welcome to FreelanceHub API, Anaadhufu!\n');
+    res.send('This is the current freelance server\n');
 });
 
 
