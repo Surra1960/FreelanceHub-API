@@ -6,9 +6,22 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 
-async function signUp(req,res){
+async function signUp(req,res,next){
 
     const {email,password}=req.body;
+    if(!email || email.trim() === '' || !password || password.trim() === ''){
+        return res.status(400).json({message:'Missing required credentials'});
+    }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+        return res.status(400).json({message:'Invalid email format'});
+    }
+    if(password.length < 6){
+        return res.status(400).json({message:'Password must be at least 6 characters long'});
+    }
+    if(!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)|| !/[!@#$%^&*]/.test(password)){
+        return res.status(400).json({message:'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'});
+    }
+
   try{
     const hashedPassword = await bcrypt.hash(password,12);
 
@@ -20,12 +33,12 @@ async function signUp(req,res){
         user: rows[0]
         });
 
- } catch(error){
-    if(error.code === '23505'){
+ } catch(err){
+    if(err.code === '23505'){
         res.status(400).json({message:"Email already exists"});
     }
     else{
-        res.status(500).json({message:"Internal Server Error"});
+        next(err);
     }
 
 }
@@ -34,9 +47,12 @@ async function signUp(req,res){
     
    
 
-async function Login(req,res){
+async function Login(req,res,next){
 
     const {email,password}=req.body;
+    if(!email || email.trim() === '' || !password || password.trim() === ''){
+        return res.status(400).json({message:'Missing required credentials'});
+    }
 
     try{
         const {rows} =await pool.query('select * from users where email = $1',[email]);
@@ -55,11 +71,12 @@ async function Login(req,res){
             token:token
         })
 
-    } catch(error){
-        res.status(500).json({message:"Internal Server Error"});
-
+    } catch(err){
+        next(err);
     }  
 
 }
+
+
 
 module.exports={signUp,Login};
