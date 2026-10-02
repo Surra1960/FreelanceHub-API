@@ -1,9 +1,20 @@
 
 
 const express = require('express');
+import {Request,Response} from 'express';
 const router = express.Router();
 const pool = require('../config/database');
 const {signUp, Login}=require('../controllers/authController');
+
+import type {AuthUser} from '../types/auth';
+
+declare global {
+    namespace Express {
+        interface Request {
+            user: AuthUser;
+        }
+    }
+}
 
 const authMiddleware=require('../middleware/auth');
 
@@ -11,7 +22,7 @@ const authMiddleware=require('../middleware/auth');
 router.post('/signup',signUp);
 router.post('/login',Login);
 
-router.get('/me',authMiddleware,async (req,res)=>{
+router.get('/me',authMiddleware,async (req:Request,res:Response)=>{
     
     try{
         const {rows}= await pool.query('select id,email,role from users where id=$1',[req.user.userId]);
