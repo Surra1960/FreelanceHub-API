@@ -1,12 +1,20 @@
 
-const pool = require('../config/database');
-
-const bcrypt = require('bcrypt');
-
+import {Request,Response,NextFunction} from 'express';
+import type { AuthCredentials,SignUpUser,LoginUser,AuthUser } from '../types/auth';
+import pool from '../config/database';
+import * as bcrypt from 'bcrypt';
 const jwt = require('jsonwebtoken');
 
+const requiredEnv=(name:string):string=>{
+    const value=process.env[name];
+    if(!value){
+        throw new Error(`Missing required environment variable: ${name}`);
+    }
+    return value;
+}
 
-async function signUp(req,res,next){
+
+async function signUp(req:Request<{},unknown,AuthCredentials>,res:Response,next:NextFunction){
 
     const {email,password}=req.body;
     if(!email || email.trim() === '' || !password || password.trim() === ''){
@@ -25,16 +33,19 @@ async function signUp(req,res,next){
   try{
     const hashedPassword = await bcrypt.hash(password,12);
 
-     const {rows} =await pool.query('insert into users(email,password,role) values($1,$2,$3) returning id,email,role',[email,hashedPassword,'user']);    
-
+     const {rows} =await pool.query<SignUpUser>('insert into users(email,password,role) values($1,$2,$3) returning id,email,role',[email,hashedPassword,'user']);    
+    const user = rows[0];
+    if(!user){
+        return res.status(500).json({message:'User was created but no user row was returned'});
+    }
     res.status(201).json(
         {
         message:"User created successfully",
-        user: rows[0]
+        user: user
         });
 
  } catch(err){
-    if(err.code === '23505'){
+    if((err instanceof Error && 'code' in err && err.code === '23505')){
         res.status(400).json({message:"Email already exists"});
     }
     else{
@@ -47,7 +58,7 @@ async function signUp(req,res,next){
     
    
 
-async function Login(req,res,next){
+async function Login(req:Request<{},unknown,AuthCredentials>,res:Response,next:NextFunction){
 
     const {email,password}=req.body;
     if(!email || email.trim() === '' || !password || password.trim() === ''){
@@ -55,7 +66,7 @@ async function Login(req,res,next){
     }
 
     try{
-        const {rows} =await pool.query('select * from users where email = $1',[email]);
+        const {rows} =await pool.query<LoginUser>('select * from users where email = $1',[email]);
         const user=rows[0];
 
         if(!user || !(await bcrypt.compare(password,user.password))){
@@ -63,7 +74,12 @@ async function Login(req,res,next){
                 error: 'Invalid credentials'
             })
         }
-        const token=jwt.sign({userId:user.id, role:user.role}, process.env.JWT_SECRET, {expiresIn:'1h'});
+
+const payload: AuthUser = {
+    userId: user.id,
+    role: user.role
+};
+        const token=jwt.sign(payload, requiredEnv('JWT_SECRET'), {expiresIn:'1h'});
 
 
         res.status(200).json({
